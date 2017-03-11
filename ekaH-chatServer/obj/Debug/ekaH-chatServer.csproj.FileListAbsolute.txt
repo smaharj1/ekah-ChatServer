@@ -1,0 +1,6 @@
+C:\Users\sujil\Desktop\ekaH\ekaH-chatServer\ekaH-chatServer\bin\Debug\ekaH-chatServer.exe.config
+C:\Users\sujil\Desktop\ekaH\ekaH-chatServer\ekaH-chatServer\obj\Debug\ekaH-chatServer.csprojResolveAssemblyReference.cache
+C:\Users\sujil\Desktop\ekaH\ekaH-chatServer\ekaH-chatServer\bin\Debug\ekaH-chatServer.exe
+C:\Users\sujil\Desktop\ekaH\ekaH-chatServer\ekaH-chatServer\bin\Debug\ekaH-chatServer.pdb
+C:\Users\sujil\Desktop\ekaH\ekaH-chatServer\ekaH-chatServer\obj\Debug\ekaH-chatServer.exe
+C:\Users\sujil\Desktop\ekaH\ekaH-chatServer\ekaH-chatServer\obj\Debug\ekaH-chatServer.pdb
