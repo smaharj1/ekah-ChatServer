@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -35,9 +37,10 @@ namespace ekaH_chatServer
         private static int totalClients = 0;
 
         private static Socket serverSocket;
-        //private static List<Client> allClients;
+        private static List<string> allClients = new List<string>();
 
-        // This stores the map of client end point address to the particular clients.
+        // This stores the map of client email address to the particular clients.
+        // email --> Client
         private static Dictionary<string, Client> clientTable = new Dictionary<string,Client>();
 
         private static ChatServer chatServer;
@@ -138,7 +141,7 @@ namespace ekaH_chatServer
                 {
                     // This is the first time the client is actually identified with the email id.
                     // Add the client to the dictionary of active users.
-                    addClient(clientSoc, textReceived.Substring(3));
+                    addClient(ref client, textReceived.Substring(3));
                     
                 }
                 else if (textReceived.Contains(":@:"))
@@ -160,6 +163,12 @@ namespace ekaH_chatServer
                         tempClient.ClientSocket.BeginSend(sendingBuff, 0, sendingBuff.Length, SocketFlags.None, new AsyncCallback(sendCallBack), tempClient.ClientSocket);
                     }
                 }
+                else if (textReceived.StartsWith("@@ll"))
+                {
+                    // Send back the list of online users.
+                    sendActiveUsersList();
+
+                }
                 else
                 {
                     string textToSend = "Something went quack. Message wasn't delivered";
@@ -177,25 +186,27 @@ namespace ekaH_chatServer
         {
             
             Socket clientSoc = (Socket)asyncRes.AsyncState;
-            
 
             clientSoc.EndSend(asyncRes);
         }
 
-        private static void addClient(Socket soc, string email)
+        private static void addClient(ref Client newClient, string email)
         {
             
             if (!clientTable.ContainsKey(email))
             {
-                string tempName = soc.RemoteEndPoint.ToString();
+                //string tempName = soc.RemoteEndPoint.ToString();
 
-                Client newClient = new Client(soc, tempName,email);
+                //Client newClient = new Client(soc, tempName,email);
+                newClient.EmailID = email;
 
                 clientTable.Add(email, newClient);
+                allClients.Add(email);
+
                 //allClients.Add(new Client(soc, tempName));
 
-                Console.WriteLine("Client connected: " + email + " -->" + tempName);
-
+                Console.WriteLine("Client connected: " + email + " -->" + newClient.EndPoint);
+                sendActiveUsersList();
                 totalClients++;
             }
         }
@@ -211,8 +222,37 @@ namespace ekaH_chatServer
             {
                 // Remove it from the dictionary and the list.
                 clientTable.Remove(soc.EmailID);
+                allClients.Remove(soc.EmailID);
 
+                Console.WriteLine("Removing client " + soc.EmailID);
+
+                sendActiveUsersList();
                 totalClients--;
+            }
+        }
+
+        private static void sendActiveUsersList()
+        {
+            StringBuilder toSend = new StringBuilder("$clients$");
+            
+            foreach(string client in allClients)
+            {
+                toSend.Append(client);
+                toSend.Append("|");
+            }
+
+            byte[] dataToSend = Encoding.ASCII.GetBytes(toSend.ToString());
+            
+
+            //byte[] trigger = Encoding.ASCII.GetBytes("$clients$");
+
+            foreach (KeyValuePair<string, Client> entry in clientTable)
+            {
+                Console.WriteLine("Sending user list to " + entry.Value.EmailID);
+                Socket soc = entry.Value.ClientSocket;
+                //soc.Send(trigger);
+                //soc.BeginSend(trigger, 0, trigger.Length, SocketFlags.None, new AsyncCallback(sendCallBack), soc);
+                soc.BeginSend(dataToSend, 0, dataToSend.Length, SocketFlags.None, new AsyncCallback(sendCallBack), soc);
             }
         }
     }
