@@ -123,6 +123,7 @@ namespace ekaH_chatServer
             catch (Exception)
             {
                 Console.WriteLine("Could not receive the data");
+                removeClient(client);
                 return;
             }
 
