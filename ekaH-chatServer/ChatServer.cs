@@ -11,249 +11,319 @@ using System.Threading.Tasks;
 
 namespace ekaH_chatServer
 {
+    /// <summary>
+    /// This class represents the current open client connection. It connects
+    /// the client's email to their socket. The email acts as the id for the client.
+    /// </summary>
     class Client
     {
-        public Socket ClientSocket { get; set; }
-        public string EndPoint { get; set; }
-        public string EmailID { get; set; }
+        /// <summary>
+        /// It holds the client's socke.t
+        /// </summary>
+        public Socket m_clientSocket { get; set; }
 
-        public Client(Socket soc, string tempName, string id)
-        {
-            EmailID = id;
-            ClientSocket = soc;
-            EndPoint = tempName;
-        }
+        /// <summary>
+        /// It holds the end point address of the client.
+        /// </summary>
+        public string m_endPoint { get; set; }
 
-        public Client(Socket soc, string tempName)
+        /// <summary>
+        /// It holds the email id of the client.
+        /// </summary>
+        public string m_emailID { get; set; }
+
+        /// <summary>
+        /// This is a constructor.
+        /// </summary>
+        /// <param name="a_soc">It holds the client's socket.</param>
+        /// <param name="a_tempName">It holds the end point address of the client.</param>
+        public Client(Socket a_soc, string a_tempName)
         {
-            ClientSocket = soc;
-            EndPoint = tempName;
+            m_clientSocket = a_soc;
+            m_endPoint = a_tempName;
         }
     }
 
+    /// <summary>
+    /// This class is the server for Ekah's online chat functionality.
+    /// </summary>
     class ChatServer
     {
-        private static byte[] globalBuffer = new byte[1024];
-        private static int totalClients = 0;
+        /// <summary>
+        /// It is the global buffer tha holds the messages received.
+        /// </summary>
+        private static byte[] m_globalBuffer = new byte[1024];
 
-        private static Socket serverSocket;
-        private static List<string> allClients = new List<string>();
+        /// <summary>
+        /// It holds the total number of clients currently connected.
+        /// </summary>
+        private static int m_totalClients = 0;
 
-        // This stores the map of client email address to the particular clients.
-        // email --> Client
-        private static Dictionary<string, Client> clientTable = new Dictionary<string,Client>();
+        /// <summary>
+        /// It represents the server's socket.
+        /// </summary>
+        private static Socket m_serverSocket;
 
-        private static ChatServer chatServer;
+        /// <summary>
+        /// It is the list of all the clients. It holds the email addresses.
+        /// </summary>
+        private static List<string> m_allClients = new List<string>();
 
+        /// <summary>
+        /// This stores the map of client email address to the particular clients.
+        /// email --> Client
+        /// </summary>
+        private static Dictionary<string, Client> m_clientTable = new Dictionary<string,Client>();
+
+        /// <summary>
+        /// It is the instance of this class made in order to make the class singleton.
+        /// </summary>
+        private static ChatServer m_chatServer;
+
+        /// <summary>
+        /// This is a constructor that initiates the server to start listening.
+        /// </summary>
         private ChatServer()
         {
-            serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //allClients = new List<Client>();
+            m_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-            setupServer();
+            /// Sets up the server so that it can start listening to a port.
+            SetupServer();
             Console.ReadLine();
         }
 
-        public static ChatServer getInstance()
+        /// <summary>
+        /// This function returns the instance of this class.
+        /// </summary>
+        /// <returns>Returns the instance of the class.</returns>
+        public static ChatServer GetInstance()
         {
-            if (chatServer == null)
+            if (m_chatServer == null)
             {
-                chatServer = new ChatServer();
+                m_chatServer = new ChatServer();
             }
 
-            return chatServer;
+            return m_chatServer;
         }
         
-        private void setupServer()
+        /// <summary>
+        /// This function sets up the server by listening to port 4050 
+        /// and lets up to 5 connections to wait.
+        /// </summary>
+        private void SetupServer()
         {
             Console.WriteLine("Setting up the server...........");
-            serverSocket.Bind(new IPEndPoint(IPAddress.Any, 4050));
-            serverSocket.Listen(5);
+            m_serverSocket.Bind(new IPEndPoint(IPAddress.Any, 4050));
+            m_serverSocket.Listen(5);
 
             Console.Write("Server Running.............");
-            serverSocket.BeginAccept(new AsyncCallback(acceptCallBack), null);
+            m_serverSocket.BeginAccept(new AsyncCallback(AcceptCallBack), null);
         }
 
-        /*
-         * This method accepts the client and saves it for later connections purposes.
-         * It then starts to accept other connections.
-         * */
-        private static void acceptCallBack(IAsyncResult asyncRes )
+        /// <summary>
+        /// This method accepts the client and saves it for later connections purposes.
+        /// It then starts to accept other connections.
+        /// </summary>
+        /// <param name="a_asyncRes">It holds the async result which holds the values passed
+        /// between the threads.</param>
+        private static void AcceptCallBack(IAsyncResult a_asyncRes )
         {
-            Socket clientSoc = serverSocket.EndAccept(asyncRes);
+            /// Gets the client socket
+            Socket clientSoc = m_serverSocket.EndAccept(a_asyncRes);
             string tempName = clientSoc.RemoteEndPoint.ToString();
 
             Client newClient = new Client(clientSoc, tempName);
-
-            //addClient(clientSoc);
-
-            // Begins receiving the data in the socket.
-            clientSoc.BeginReceive(globalBuffer, 0, globalBuffer.Length, SocketFlags.None, new AsyncCallback(receiveCallBack), newClient);
+            
+            /// Begins receiving the data in the socket.
+            clientSoc.BeginReceive(m_globalBuffer, 0, m_globalBuffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), newClient);
 
             /* After ending the accept to get the client, the server stops accepting the
              * clients. So, begins it again */
-            serverSocket.BeginAccept(new AsyncCallback(acceptCallBack), null);
+            m_serverSocket.BeginAccept(new AsyncCallback(AcceptCallBack), null);
         }
 
-
-        private static void receiveCallBack(IAsyncResult asyncRes)
+        /// <summary>
+        /// This is a call back function called when data is received from a client.
+        /// </summary>
+        /// <param name="a_asyncRes">It holds the async result.</param>
+        private static void ReceiveCallBack(IAsyncResult a_asyncRes)
         {
-            Client client = (Client)asyncRes.AsyncState;
-            //Socket clientSoc = (Socket)asyncRes.AsyncState;
-            Socket clientSoc = client.ClientSocket;
+            /// Gets the client that is passing in the data.
+            Client client = (Client)a_asyncRes.AsyncState;
+
+            Socket clientSoc = client.m_clientSocket;
 
             string remoteEndpoint = clientSoc.RemoteEndPoint.ToString();
 
-            // Remove the socket from the connected list if the client is not connected.
+            /// Remove the socket from the connected list if the client is not connected.
             if (!clientSoc.Connected)
             {
-                removeClient(client);
+                RemoveClient(client);
                 Console.WriteLine("Client left!");
-                Console.WriteLine("Total online clients: " + totalClients);
-
+                Console.WriteLine("Total online clients: " + m_totalClients);
             }
 
-            // Receives the data amount.
+            /// Receives the data amount.
             int received = 0;
 
             try
             {
-                received = clientSoc.EndReceive(asyncRes);
+                received = clientSoc.EndReceive(a_asyncRes);
             }
             catch (Exception)
             {
                 Console.WriteLine("Could not receive the data");
-                removeClient(client);
+                RemoveClient(client);
                 return;
             }
 
+            /// Checks if received data is empty. If not, then addresses the text received and
+            /// handles it according to the plan.
             if (received != 0)
             {
                 byte[] tempBuff = new byte[received];
 
-                Array.Copy(globalBuffer, tempBuff, received);
+                Array.Copy(m_globalBuffer, tempBuff, received);
 
+                /// Decodes the message received.
                 string textReceived = Encoding.ASCII.GetString(tempBuff);
                 Console.WriteLine("Received from " + clientSoc.RemoteEndPoint.ToString());
                 Console.WriteLine("\t " + textReceived);
 
-                // Check if the string starts with @@@. It means that the client just connected. So, modify the value in the map.
+                /// Check if the string starts with @@@. It means that the client just connected. 
+                /// So, modify the value in the map.
                 if (textReceived.StartsWith("@@@"))
                 {
-                    // This is the first time the client is actually identified with the email id.
-                    // Add the client to the dictionary of active users.
-                    addClient(ref client, textReceived.Substring(3));
+                    /// This is the first time the client is actually identified with the email id.
+                    /// Add the client to the dictionary of active users.
+                    AddClient(ref client, textReceived.Substring(3));
                     
                 }
                 else if (textReceived.Contains(":@:"))
                 {
-                    // Handles the message sending process to the email address mentioned.
-                    // :@: represents the message and to whom is it being sent. Left side represents who should receive it.
+                    /// Handles the message sending process to the email address mentioned.
+                    /// :@: represents the message and to whom is it being sent. Left side 
+                    /// represents who should receive it.
                     string[] splitted = textReceived.Split(new string[] { ":@:" }, 2, StringSplitOptions.None);
                     string email = splitted[0];
-                    string toSend = client.EmailID+":@:"+ splitted[1];
+                    string toSend = client.m_emailID+":@:"+ splitted[1];
                     
-                    // TODO Check what is received and what is to be done to the things received 
-                    // and who to send it to.
 
                     byte[] sendingBuff = Encoding.ASCII.GetBytes(toSend);
-                    if (clientTable.ContainsKey(email))
+
+                    /// Sends the text from the sender to the desired receiver that we have 
+                    /// decoded from the data sent.
+                    if (m_clientTable.ContainsKey(email))
                     {
-                        Client tempClient = clientTable[email];
-                        Console.WriteLine("sending message to: " + email + " " + clientTable[email].EndPoint + "is");
-                        tempClient.ClientSocket.BeginSend(sendingBuff, 0, sendingBuff.Length, SocketFlags.None, new AsyncCallback(sendCallBack), tempClient.ClientSocket);
+                        Client tempClient = m_clientTable[email];
+                        Console.WriteLine("sending message to: " + email + " " + m_clientTable[email].m_endPoint + "is");
+                        tempClient.m_clientSocket.BeginSend(sendingBuff, 0, sendingBuff.Length, SocketFlags.None, new AsyncCallback(SendCallBack), tempClient.m_clientSocket);
                     }
                 }
                 else if (textReceived.StartsWith("@@ll"))
                 {
-                    // Send back the list of online users.
-                    sendActiveUsersList();
-
+                    /// Send back the list of online users.
+                    SendActiveUsersList();
                 }
                 else
                 {
+                    /// Says that the message was not delivered if any issues were found.
                     string textToSend = "Something went quack. Message wasn't delivered";
                     byte[] sendingBuff = Encoding.ASCII.GetBytes(textToSend);
-                    clientSoc.BeginSend(sendingBuff, 0, sendingBuff.Length, SocketFlags.None, new AsyncCallback(sendCallBack), client);
+                    clientSoc.BeginSend(sendingBuff, 0, sendingBuff.Length, SocketFlags.None, new AsyncCallback(SendCallBack), client);
                 }
                 
             }
 
-            clientSoc.BeginReceive(globalBuffer, 0, globalBuffer.Length, SocketFlags.None, new AsyncCallback(receiveCallBack), client);
-
+            /// Begins receiving in the socket again after the message is handled.
+            clientSoc.BeginReceive(m_globalBuffer, 0, m_globalBuffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), client);
         }
 
-        private static void sendCallBack(IAsyncResult asyncRes)
+        /// <summary>
+        /// This is a callback function when the data is sent.
+        /// </summary>
+        /// <param name="a_asyncRes">It is the async result.</param>
+        private static void SendCallBack(IAsyncResult a_asyncRes)
         {
             
-            Socket clientSoc = (Socket)asyncRes.AsyncState;
+            Socket clientSoc = (Socket)a_asyncRes.AsyncState;
 
-            clientSoc.EndSend(asyncRes);
+            clientSoc.EndSend(a_asyncRes);
         }
 
-        private static void addClient(ref Client newClient, string email)
+        /// <summary>
+        /// This function adds the client to the list of existing open connections.
+        /// </summary>
+        /// <param name="a_newClient">It represents the new client.</param>
+        /// <param name="a_email">It holds the email of the client.</param>
+        private static void AddClient(ref Client a_newClient, string a_email)
         {
-            
-            if (!clientTable.ContainsKey(email))
+            if (!m_clientTable.ContainsKey(a_email))
             {
-                //string tempName = soc.RemoteEndPoint.ToString();
+                /// Adds the client to the lists.
+                a_newClient.m_emailID = a_email;
 
-                //Client newClient = new Client(soc, tempName,email);
-                newClient.EmailID = email;
+                m_clientTable.Add(a_email, a_newClient);
+                m_allClients.Add(a_email);
 
-                clientTable.Add(email, newClient);
-                allClients.Add(email);
 
-                //allClients.Add(new Client(soc, tempName));
+                Console.WriteLine("Client connected: " + a_email + " -->" + a_newClient.m_endPoint);
 
-                Console.WriteLine("Client connected: " + email + " -->" + newClient.EndPoint);
-                sendActiveUsersList();
-                totalClients++;
+                /// Updates all the connected users about the new list of online users.
+                SendActiveUsersList();
+                m_totalClients++;
             }
         }
 
-        private static void removeClient(Client soc)
+        /// <summary>
+        /// This function remores the client from the list.
+        /// </summary>
+        /// <param name="a_soc">It represents the client socket that is being removed.</param>
+        private static void RemoveClient(Client a_soc)
         {
-            // If the email id is null or empty, then we have not even added this client to our list. So, no need to worry about it.
-            if (string.IsNullOrEmpty(soc.EmailID))
+            /// If the email id is null or empty, then we have not even added 
+            /// this client to our list. So, no need to worry about it.
+            if (string.IsNullOrEmpty(a_soc.m_emailID))
             {
                 return;
             }
-            if (clientTable.ContainsKey(soc.EmailID))
+
+            if (m_clientTable.ContainsKey(a_soc.m_emailID))
             {
-                // Remove it from the dictionary and the list.
-                clientTable.Remove(soc.EmailID);
-                allClients.Remove(soc.EmailID);
+                /// Remove it from the dictionary and the list.
+                m_clientTable.Remove(a_soc.m_emailID);
+                m_allClients.Remove(a_soc.m_emailID);
 
-                Console.WriteLine("Removing client " + soc.EmailID);
+                Console.WriteLine("Removing client " + a_soc.m_emailID);
 
-                sendActiveUsersList();
-                totalClients--;
+                SendActiveUsersList();
+                m_totalClients--;
             }
         }
 
-        private static void sendActiveUsersList()
+        /// <summary>
+        /// This function sends the new list of online users to all the online users.
+        /// </summary>
+        private static void SendActiveUsersList()
         {
+            /// Builds the string such that the clients know that it is not a conversation
+            /// message but it is the new list of online users.
             StringBuilder toSend = new StringBuilder("$clients$");
             
-            foreach(string client in allClients)
+            foreach(string client in m_allClients)
             {
                 toSend.Append(client);
                 toSend.Append("|");
             }
 
             byte[] dataToSend = Encoding.ASCII.GetBytes(toSend.ToString());
-            
 
-            //byte[] trigger = Encoding.ASCII.GetBytes("$clients$");
-
-            foreach (KeyValuePair<string, Client> entry in clientTable)
+            /// It sends the new list of online users to all the existing users.
+            foreach (KeyValuePair<string, Client> entry in m_clientTable)
             {
-                Console.WriteLine("Sending user list to " + entry.Value.EmailID);
-                Socket soc = entry.Value.ClientSocket;
-                //soc.Send(trigger);
-                //soc.BeginSend(trigger, 0, trigger.Length, SocketFlags.None, new AsyncCallback(sendCallBack), soc);
-                soc.BeginSend(dataToSend, 0, dataToSend.Length, SocketFlags.None, new AsyncCallback(sendCallBack), soc);
+                Console.WriteLine("Sending user list to " + entry.Value.m_emailID);
+                Socket soc = entry.Value.m_clientSocket;
+                soc.BeginSend(dataToSend, 0, dataToSend.Length, SocketFlags.None, new AsyncCallback(SendCallBack), soc);
             }
         }
     }

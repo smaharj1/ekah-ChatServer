@@ -10,9 +10,7 @@ namespace ekaH_chatServer
     {
         static void Main(string[] args)
         {
-            ChatServer server = ChatServer.getInstance();
-
-
+            ChatServer server = ChatServer.GetInstance();
         }
     }
 }
